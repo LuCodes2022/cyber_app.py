@@ -1,8 +1,25 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
+from flask_sqlalchemy import SQLAlchemy
 import re
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Necessary for flash messages
+
+# Database configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///contacts.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+# Define the Contact model
+class Contact(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    first_name = db.Column(db.String(80), nullable=False)
+    last_name = db.Column(db.String(80), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    country = db.Column(db.String(50), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    gender = db.Column(db.String(1), nullable=False)
+    subjects = db.Column(db.String(200), nullable=False)
 
 # List of countries for the dropdown
 countries = ['USA', 'Canada', 'UK', 'France', 'Germany', 'Australia']
@@ -34,6 +51,7 @@ def contact():
         # Default subjects to "Others" if none selected
         if not subjects:
             subjects = ['Others']
+        subjects_str = ', '.join(subjects)
 
         # Validation
         errors = []
@@ -59,7 +77,11 @@ def contact():
             return render_template('contact.html', first_name=first_name, last_name=last_name, email=email,
                                    country=country, message=message, gender=gender, subjects=subjects, countries=countries)
         else:
-            # If no errors, display the thank you page with encoded information
+            # If no errors, save to the database and display the thank you page with encoded information
+            new_contact = Contact(first_name=first_name, last_name=last_name, email=email, country=country,
+                                  message=message, gender=gender, subjects=subjects_str)
+            db.session.add(new_contact)
+            db.session.commit()
             return render_template('thank_you.html', first_name=first_name, last_name=last_name, email=email,
                                    country=country, message=message, gender=gender, subjects=subjects)
 
@@ -73,4 +95,5 @@ def is_valid_email(email):
     return re.match(r"[^@]+@[^@]+\.[^@]+", email)
 
 if __name__ == '__main__':
+    db.create_all()  # Create database tables
     app.run(debug=True)
